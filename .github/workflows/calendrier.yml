@@ -36,6 +36,10 @@ jobs:
           else
             echo "Calendrier indisponible pour cette execution"
           fi
+      - name: Recuperer les Actual USD (FRED)
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python3 fetch_actuals.py _site/actuals.json || echo "Actual FRED indisponibles pour cette execution"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
