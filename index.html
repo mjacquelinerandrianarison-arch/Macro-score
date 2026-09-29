@@ -41,6 +41,7 @@
   --brass:#D9AA52; --brass-soft:#3A3120; --field:#141D2A; --focus:#7FA8DE;
 }
 *,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45}
 button,input,select{font:inherit;color:inherit}
@@ -201,6 +202,12 @@ dialog .dbody{padding:12px 16px 16px;max-height:70vh;overflow:auto}
 .alert{border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px;background:var(--brass-soft);border-left:3px solid var(--brass)}
 .alert.hot{background:var(--bear-soft);border-left-color:var(--bear)}
 .empty{padding:16px;font-size:14px;color:var(--slate)}
+.src{font-size:12px;color:var(--slate);margin-top:6px}
+.src a{color:var(--focus)}
+.todo{display:block;width:100%;text-align:left;border:1px solid var(--brass);background:var(--brass-soft);border-radius:12px;padding:12px;margin-bottom:14px;font-size:14px}
+.todo b{font-family:var(--num);font-size:17px}
+.pend{color:var(--brass);font-weight:600}
+.chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brass);margin-left:5px;vertical-align:middle}
 @media (prefers-reduced-motion:no-preference){
   .rung .bar{transition:width .35s ease}
 }
@@ -226,6 +233,7 @@ dialog .dbody{padding:12px 16px 16px;max-height:70vh;overflow:auto}
 
   <!-- Classement -->
   <section class="view on" id="v-rank" aria-labelledby="t-rank">
+    <div id="todoBox"></div>
     <div class="verdict" id="verdict"></div>
     <div class="ladder" id="ladder"></div>
     <p class="foot">Le biais indique seulement le sens autorisé. L'entrée dépend de la structure HTF, de la cassure et du retest (onglet Setup).</p>
@@ -351,12 +359,34 @@ const CHECKS=[
   ["brk","Cassure nette",2],["close","Clôture confirmée",1],["bos","BOS / CHOCH",1],
   ["rt","Retest propre",2],["rej","Rejet (pin bar, engulfing…)",1],["conf","Confirmation M5/M15",1]
 ];
+const OFFICIAL={USD:{stats:"https://www.bls.gov/schedule/",gdp:"https://www.bea.gov",cb:"https://www.federalreserve.gov"},
+  EUR:{stats:"https://ec.europa.eu/eurostat",cb:"https://www.ecb.europa.eu"},GBP:{stats:"https://www.ons.gov.uk/releasecalendar",cb:"https://www.bankofengland.co.uk"},
+  JPY:{stats:"https://www.stat.go.jp/english/",cb:"https://www.boj.or.jp/en/"},CHF:{stats:"https://www.bfs.admin.ch",gdp:"https://www.seco.admin.ch",cb:"https://www.snb.ch"},
+  CAD:{stats:"https://www.statcan.gc.ca",cb:"https://www.banqueducanada.ca"},AUD:{stats:"https://www.abs.gov.au",cb:"https://www.rba.gov.au"},
+  NZD:{stats:"https://www.stats.govt.nz",cb:"https://www.rbnz.govt.nz"}};
+function officialUrl(c,i){const o=OFFICIAL[c];if(i===6&&o.gdp)return o.gdp;if(c==="USD"&&(i===7||i===8||i===9))return "https://www.forexfactory.com/calendar";if(i===7||i===8)return "https://www.forexfactory.com/calendar";return o.stats;}
+/* Correspondance annonces du calendrier → indicateurs (ordre de priorité) */
+const X_REGION=/german|french|spanish|italian|tokyo core|^ivey|claims|core retail|deflator|price index q/i;
+const MAP=[
+  [/^(final |flash )?cpi( flash estimate)? y\/y$/i,/^national cpi y\/y$/i,/^cpi y\/y$/i,/^cpi q\/q$/i,/^cpi m\/m$/i],
+  [/^(final )?core cpi( flash estimate)? y\/y$/i,/^national core cpi y\/y$/i,/^trimmed mean cpi/i,/^(median|trimmed|common) cpi y\/y$/i,/^core cpi m\/m$/i],
+  [/^ppi y\/y$/i,/^ppi m\/m$/i,/^ppi (input|output) q\/q$/i,/^ppi q\/q$/i],
+  {USD:[/^non-farm employment change$/i],AUD:[/^employment change$/i],CAD:[/^employment change$/i],NZD:[/^employment change q\/q$/i],EUR:[/^employment change q\/q$/i]},
+  [/^unemployment rate$/i],
+  {USD:[/^average hourly earnings m\/m$/i],GBP:[/^average earnings index 3m\/y$/i],AUD:[/^wage price index q\/q$/i],NZD:[/^labor cost index q\/q$/i]},
+  [/^advance gdp q\/q$/i,/^prelim( flash)? gdp q\/q$/i,/^(final )?gdp q\/q$/i,/^gdp m\/m$/i],
+  {USD:[/^ism manufacturing pmi$/i],NZD:[/^business nz manufacturing index$/i],"*":[/^flash manufacturing pmi$/i,/^manufacturing pmi$/i]},
+  {USD:[/^ism services pmi$/i],NZD:[/^business nz services index$/i],"*":[/^flash services pmi$/i,/^services pmi$/i]},
+  [/^retail sales m\/m$/i,/^retail sales y\/y$/i,/^retail sales q\/q$/i]
+];
+const RATE={USD:/^federal funds rate$/i,EUR:/^main refinancing rate$/i,GBP:/^official bank rate$/i,JPY:/^boj policy rate$/i,
+  CHF:/^snb policy rate$/i,CAD:/^overnight rate$/i,AUD:/^cash rate$/i,NZD:/^official cash rate$/i};
 const DIRECT_FEED="https://nfs.faireconomy.media/ff_calendar_thisweek.json";
 const DEFAULT_FEED="calendar.json"; // copie mise à jour par GitHub Actions, sur le même site que l'app
 const WLABEL={cb:"Banque centrale",inf:"Inflation",emp:"Emploi",cro:"Croissance",risk:"Risque / matières premières",ant:"Anticipations / événements"};
 
 /* ================= État ================= */
-function blankCur(c){return {ind:tpl(c).map(t=>({a:"",f:"",p:"",s1:t.s1,s2:t.s2,sens:t.sens})),
+function blankCur(c){return {ind:tpl(c).map(t=>({a:"",f:"",p:"",s1:t.s1,s2:t.s2,sens:t.sens,lock:{},evt:null})),
   cb:{att:"",dec:"",infl:"",obj:TARGET[c],guid:"",proj:"",anti:""},risk:0,ant:0,conf:"Moyenne"};}
 function defaultState(withExample){
   const s={v:1,example:!!withExample,weights:{cb:.30,inf:.20,emp:.15,cro:.15,risk:.10,ant:.10},mult:5,theme:"",
@@ -438,6 +468,11 @@ document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("clic
 
 /* ================= Rendu : classement ================= */
 function renderRank(){
+  const pend=pendingList(), tb=$("todoBox");
+  tb.innerHTML=pend.length?`<button type="button" class="todo" id="todoBtn"><b>${pend.length} chiffre${pend.length>1?"s":""} publié${pend.length>1?"s":""}</b> attend${pend.length>1?"ent":""} leur Actual : ${[...new Set(pend.map(p=>p.c))].join(", ")}. Touche pour les saisir.</button>`:"";
+  if(pend.length)$("todoBtn").onclick=()=>{curSel=pend[0].c;dataK=pend[0].cb?"cb":"ind";
+    $("dataSeg").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.k===dataK));
+    document.querySelector('nav.tabs button[data-v="data"]').click();};
   const sc=allScores(), list=CURR.map(c=>sc[c]).sort((a,b)=>b.score-a.score);
   const ticks=`<div class="scale"><span></span><div class="ticks num-font"><span>−10</span><span>−5</span><span>0</span><span>+5</span><span>+10</span></div><span></span></div>`;
   $("ladder").innerHTML=ticks+list.map(s=>{
@@ -463,7 +498,8 @@ function numInput(id,val,label,pm=true){
   return `<div class="numbox"><input id="${id}" value="${val===""||val===null||val===undefined?"":esc(String(val).replace(".",","))}" inputmode="decimal" autocomplete="off" aria-label="${esc(label)}">${pm?`<button type="button" class="pm" data-for="${id}" aria-label="Changer le signe">±</button>`:""}</div>`;
 }
 function renderChips(){
-  $("curChips").innerHTML=CURR.map(c=>`<button class="chip" data-c="${c}" aria-pressed="${c===curSel}">${c}</button>`).join("");
+  const pend=pendingList();
+  $("curChips").innerHTML=CURR.map(c=>`<button class="chip" data-c="${c}" aria-pressed="${c===curSel}">${c}${pend.some(p=>p.c===c)?'<span class="dot" aria-label="Actual en attente"></span>':""}</button>`).join("");
 }
 $("curChips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;curSel=b.dataset.c;renderChips();renderData();});
 $("dataSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;dataK=b.dataset.k;
@@ -505,6 +541,7 @@ function renderData(){
       <div class="panel"><h3>Inflation vs objectif</h3>
         <div class="formrow"><div class="field"><label for="cbinfl">Inflation actuelle (%)</label>${numInput("cbinfl",b.infl,"Inflation actuelle")}</div>
         <div class="field"><label for="cbobj">Objectif (%)</label>${numInput("cbobj",b.obj,"Objectif",false)}</div></div></div>
+      ${b.evt?`<p class="src">Taux attendu rempli depuis le calendrier (${esc(b.evt.title)}, ${fmtWhen(b.evt.t)}). ${b.evt.t<Date.now()&&num(b.dec)===null?`<span class="pend">Décision publiée : saisis le taux décidé.</span> `:""}<a href="${OFFICIAL[c].cb}" target="_blank" rel="noopener">Site de la banque centrale</a></p>`:""}
       <div class="panel" id="cbSum"></div>`;
   }else{
     body.innerHTML=`<div class="panel">
@@ -523,8 +560,14 @@ function updateComputed(){
   const c=curSel,d=S.cur[c];
   if(dataK==="ind"){
     d.ind.forEach((it,i)=>{const el=$("r"+i);if(!el)return;const n=indNote(it);
-      el.innerHTML=n?`<span>Surprise ${sgn(n.sur)}${n.o!==n.sur?` (orientée ${sgn(n.o)})`:""}</span><span class="pill ${cls(n.g)}">${sgn(n.g,0)} / ${sgn(n.n10,0)}</span>`
-        :`<span>Saisissez Actual et Forecast</span><span class="pill zero">—</span>`;});
+      const ev=it.evt, st=ev?pubState(it):null;
+      let msg;
+      if(n)msg=`<span>Surprise ${sgn(n.sur)}${n.o!==n.sur?` (orientée ${sgn(n.o)})`:""}</span><span class="pill ${cls(n.g)}">${sgn(n.g,0)} / ${sgn(n.n10,0)}</span>`;
+      else if(st==="due")msg=`<span class="pend">Publié : saisis l'Actual</span><span class="pill zero">—</span>`;
+      else if(st==="soon")msg=`<span>Publication ${fmtWhen(ev.t)}</span><span class="pill zero">—</span>`;
+      else msg=`<span>Saisissez Actual et Forecast</span><span class="pill zero">—</span>`;
+      el.innerHTML=msg+(ev?`<div class="src" style="flex-basis:100%">Forecast et Previous remplis depuis le calendrier (${esc(ev.title)}, ${fmtWhen(ev.t)}). <a href="${officialUrl(c,i)}" target="_blank" rel="noopener">Source officielle de l'Actual</a></div>`:"");
+      el.style.flexWrap="wrap";});
   }
   if(dataK==="cb"&&$("cbSum")){
     const r=cbScore(c);
@@ -550,9 +593,9 @@ function updateComputed(){
 /* Saisie : délégation d'événements */
 function setFromInput(id,raw){
   const c=curSel,d=S.cur[c];let m;
-  if((m=id.match(/^i(\d+)(a|f|p|s1|s2)$/))){d.ind[+m[1]][m[2]]=raw;}
+  if((m=id.match(/^i(\d+)(a|f|p|s1|s2)$/))){const it=d.ind[+m[1]];it[m[2]]=raw;if("afp".includes(m[2])){it.lock=it.lock||{};it.lock[m[2]]=true;}}
   else if((m=id.match(/^i(\d+)sens$/))){d.ind[+m[1]].sens=+raw;}
-  else if((m=id.match(/^cb(att|dec|infl|obj)$/))){d.cb[m[1]]=raw;}
+  else if((m=id.match(/^cb(att|dec|infl|obj)$/))){d.cb[m[1]]=raw;d.cb.lock=d.cb.lock||{};d.cb.lock[m[1]]=true;}
   else if((m=id.match(/^cb(guid|proj|anti)$/))){d.cb[m[1]]=raw;}
   else return;
   if(S.example){S.example=false;$("exampleBanner").hidden=true;}
@@ -663,8 +706,8 @@ function newWeek(){
   S=defaultState(false);["weights","mult","theme","newsWin","feedUrl","calCur","calImp"].forEach(k=>S[k]=keep[k]);
   CURR.forEach(c=>S.cur[c].ind.forEach((it,i)=>Object.assign(it,keep.seuils[c][i])));
 }
-$("newWeek").addEventListener("click",()=>{if(!confirm("Effacer toutes les données saisies de la semaine ? Les réglages et les seuils sont conservés."))return;newWeek();save();$("settings").close();renderAll();});
-$("clearExample").addEventListener("click",()=>{newWeek();save();renderAll();});
+$("newWeek").addEventListener("click",()=>{if(!confirm("Effacer toutes les données saisies de la semaine ? Les réglages et les seuils sont conservés."))return;newWeek();save();$("settings").close();renderAll();applyCalendar();});
+$("clearExample").addEventListener("click",()=>{newWeek();save();renderAll();applyCalendar();});
 
 /* ================= Rendu global ================= */
 function renderAll(){
@@ -705,8 +748,48 @@ async function loadCalendar(force){
     if(!events)throw lastErr||new Error("flux");
     cal={events,fetchedAt:Date.now(),error:""};
     try{localStorage.setItem(CAL_LS,JSON.stringify({events:cal.events,fetchedAt:cal.fetchedAt}));}catch(e){}
+    applyCalendar();
   }catch(e){cal.error=navigator.onLine===false?"Hors ligne":"Flux indisponible";}
   if(view==="cal")renderCal(); if(view==="setup")updateSetup();
+}
+function fmtWhen(t){const d=new Date(t);return d.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}
+function cleanNum(v){if(v===undefined||v===null)return "";const m=String(v).replace(",",".").match(/-?\d+(\.\d+)?/);return m?m[0].replace(".",","):"";}
+function pubState(it){if(!it.evt)return null;if(num(it.a)!==null)return "done";return it.evt.t<=Date.now()?"due":"soon";}
+function pendingList(){const out=[];CURR.forEach(c=>{const d=S.cur[c];
+  d.ind.forEach((it,i)=>{if(pubState(it)==="due")out.push({c,i});});
+  if(d.cb.evt&&d.cb.evt.t<=Date.now()&&num(d.cb.dec)===null)out.push({c,cb:true});});return out;}
+function findEvent(c,i){
+  const spec=MAP[i]; let pats=Array.isArray(spec)?spec:(spec[c]||spec["*"]||[]);
+  const evs=cal.events.filter(e=>e.country===c&&!X_REGION.test(e.title));
+  for(const re of pats){const hit=evs.filter(e=>re.test(e.title.trim()));if(hit.length)return hit[hit.length-1];}
+  return null;
+}
+function applyCalendar(){
+  if(!cal.events.length||S.example)return false;let changed=false;
+  CURR.forEach(c=>{const d=S.cur[c];
+    d.ind.forEach((it,i)=>{
+      it.lock=it.lock||{};const e=findEvent(c,i);if(!e)return;
+      const isNew=!it.evt||it.evt.id!==e.id;
+      if(isNew){ // nouvelle publication : l'ancien Actual ne correspond plus
+        if(it.evt&&!it.lock.a)it.a="";
+        if(it.evt){it.lock.a=false;it.lock.f=false;it.lock.p=false;}
+      }
+      const f=cleanNum(e.forecast),p=cleanNum(e.previous),a=cleanNum(e.actual);
+      if(f&&!it.lock.f&&it.f!==f){it.f=f;changed=true;}
+      if(p&&!it.lock.p&&it.p!==p){it.p=p;changed=true;}
+      if(a&&!it.lock.a&&it.a!==a){it.a=a;changed=true;}
+      if(isNew){it.evt={id:e.id,t:e.t,title:e.title};changed=true;}
+    });
+    const re=RATE[c],e=re?cal.events.filter(x=>x.country===c&&re.test(x.title.trim())).pop():null;
+    if(e){const b=d.cb;b.lock=b.lock||{};
+      if(!b.evt||b.evt.id!==e.id){if(b.evt&&!b.lock.dec)b.dec="";b.lock={};b.evt={id:e.id,t:e.t,title:e.title};changed=true;}
+      const f=cleanNum(e.forecast),a=cleanNum(e.actual);
+      if(f&&!b.lock.att&&String(b.att)!==f){b.att=f;changed=true;}
+      if(a&&!b.lock.dec&&String(b.dec)!==a){b.dec=a;changed=true;}
+    }
+  });
+  if(changed){save();renderAll();}
+  return changed;
 }
 function nextHigh(ccys){const now=Date.now()-5*60000;return cal.events.find(e=>e.impact==="High"&&!e.allDay&&e.t>=now&&ccys.includes(e.country))||null;}
 function inTxt(m){if(m<=0)return "maintenant";if(m<60)return "dans "+m+" min";const h=Math.floor(m/60),r=m%60;if(h<24)return "dans "+h+" h"+(r?" "+String(r).padStart(2,"0"):"");return "dans "+Math.round(h/24)+" j";}
@@ -755,6 +838,7 @@ function adopt(s){if(!s||s.v!==1)return;const base=defaultState(false);S=Object.
 
 const local=loadLocal(); if(local)adopt(local); else renderAll();
 applyTheme();
+if(!S.example)applyCalendar();
 loadCalendar(false);
 setInterval(()=>{if(view==="setup")updateSetup();if(view==="cal")renderCal();},60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadCalendar(false);});
