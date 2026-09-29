@@ -351,7 +351,8 @@ const CHECKS=[
   ["brk","Cassure nette",2],["close","Clôture confirmée",1],["bos","BOS / CHOCH",1],
   ["rt","Retest propre",2],["rej","Rejet (pin bar, engulfing…)",1],["conf","Confirmation M5/M15",1]
 ];
-const DEFAULT_FEED="https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+const DIRECT_FEED="https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+const DEFAULT_FEED="calendar.json"; // copie mise à jour par GitHub Actions, sur le même site que l'app
 const WLABEL={cb:"Banque centrale",inf:"Inflation",emp:"Emploi",cro:"Croissance",risk:"Risque / matières premières",ant:"Anticipations / événements"};
 
 /* ================= État ================= */
@@ -692,10 +693,17 @@ async function loadCalendar(force){
   if(!force&&age<60*60*1000)return;
   $("calInfo").textContent="Chargement…";
   try{
-    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),12000);
-    const r=await fetch(S.feedUrl||DEFAULT_FEED,{cache:"no-store",signal:ctl.signal});clearTimeout(to);
-    if(!r.ok)throw new Error("HTTP "+r.status);
-    cal={events:parseEvents(await r.json()),fetchedAt:Date.now(),error:""};
+    const urls=[S.feedUrl||DEFAULT_FEED];if(!urls.includes(DIRECT_FEED))urls.push(DIRECT_FEED);
+    let events=null,lastErr=null;
+    for(const u of urls){
+      try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),12000);
+        const r=await fetch(u+(u.startsWith("http")?"":"?t="+Date.now()),{cache:"no-store",signal:ctl.signal});clearTimeout(to);
+        if(!r.ok)throw new Error("HTTP "+r.status);
+        const ev=parseEvents(await r.json());if(!ev.length)throw new Error("vide");events=ev;break;}
+      catch(err){lastErr=err;}
+    }
+    if(!events)throw lastErr||new Error("flux");
+    cal={events,fetchedAt:Date.now(),error:""};
     try{localStorage.setItem(CAL_LS,JSON.stringify({events:cal.events,fetchedAt:cal.fetchedAt}));}catch(e){}
   }catch(e){cal.error=navigator.onLine===false?"Hors ligne":"Flux indisponible";}
   if(view==="cal")renderCal(); if(view==="setup")updateSetup();
@@ -742,6 +750,7 @@ function save(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>setStatus(persi
 function loadLocal(){try{const raw=localStorage.getItem(LS);if(raw){const s=JSON.parse(raw);if(s&&s.v===1)return s;}}catch(e){}return null;}
 function adopt(s){if(!s||s.v!==1)return;const base=defaultState(false);S=Object.assign(base,s);
   S.setup=Object.assign({pair:"",checks:{},news:false,dismissed:""},s.setup||{});
+  if(!S.feedUrl||S.feedUrl===DIRECT_FEED)S.feedUrl=DEFAULT_FEED;
   CURR.forEach(c=>{if(!S.cur[c])S.cur[c]=blankCur(c);});applyTheme();renderAll();}
 
 const local=loadLocal(); if(local)adopt(local); else renderAll();

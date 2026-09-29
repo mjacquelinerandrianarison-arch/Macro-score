@@ -1,0 +1,44 @@
+name: Calendrier et site
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "7 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparer le site et telecharger le calendrier
+        run: |
+          mkdir -p _site
+          cp index.html sw.js manifest.webmanifest icon-192.png icon-512.png _site/
+          if curl -fsSL -A "Mozilla/5.0" --retry 3 --max-time 30 \
+               "https://nfs.faireconomy.media/ff_calendar_thisweek.json" -o /tmp/cal.json \
+             && python3 -c "import json,sys; d=json.load(open('/tmp/cal.json')); sys.exit(0 if isinstance(d,list) and d else 1)"; then
+            cp /tmp/cal.json _site/calendar.json
+            echo "Calendrier telecharge"
+          else
+            echo "Calendrier indisponible pour cette execution"
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
