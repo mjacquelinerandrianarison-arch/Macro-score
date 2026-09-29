@@ -1,6 +1,6 @@
 // Macro Score : fonctionnement hors ligne.
 // Après chaque modification des fichiers, augmentez VERSION pour que les téléphones prennent la mise à jour.
-const VERSION = "macro-score-v4";
+const VERSION = "macro-score-v5";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 

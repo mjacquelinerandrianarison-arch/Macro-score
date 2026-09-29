@@ -542,8 +542,8 @@ function renderData(){
         <div class="formrow"><div class="field"><label for="cbinfl">Inflation actuelle (%)</label>${numInput("cbinfl",b.infl,"Inflation actuelle")}</div>
         <div class="field"><label for="cbobj">Objectif (%)</label>${numInput("cbobj",b.obj,"Objectif",false)}</div></div></div>
       ${b.evt?`<p class="src">Taux attendu rempli depuis le calendrier (${esc(b.evt.title)}, ${fmtWhen(b.evt.t)}). ${b.evt.t<Date.now()&&num(b.dec)===null?`<span class="pend">Décision publiée : saisis le taux décidé.</span> `:""}<a href="${OFFICIAL[c].cb}" target="_blank" rel="noopener">Site de la banque centrale</a></p>`:""}
-      ${b.inflSrc&&!(b.lock&&b.lock.infl)?`<p class="src">Inflation actuelle remplie automatiquement : CPI sur un an (FRED), période ${esc(b.inflSrc.slice(0,7))}.</p>`:""}
-      ${b.decSrc&&!(b.lock&&b.lock.dec)?`<p class="src">Taux décidé rempli automatiquement (FRED, borne haute de la fourchette de la Fed).</p>`:""}
+      ${b.inflSrc&&!(b.lock&&b.lock.infl)?`<p class="src">Inflation actuelle remplie automatiquement : ${c==="EUR"?"IPCH sur un an (Eurostat)":"CPI sur un an (FRED)"}, période ${esc(b.inflSrc.slice(0,7))}.</p>`:""}
+      ${b.decSrc&&!(b.lock&&b.lock.dec)?`<p class="src">Taux décidé rempli automatiquement (${c==="EUR"?"BCE, taux des opérations principales de refinancement":"FRED, borne haute de la fourchette de la Fed"}).</p>`:""}
       <div class="panel" id="cbSum"></div>`;
   }else{
     body.innerHTML=`<div class="panel">
@@ -568,7 +568,7 @@ function updateComputed(){
       else if(st==="due")msg=`<span class="pend">Publié : saisis l'Actual</span><span class="pill zero">—</span>`;
       else if(st==="soon")msg=`<span>Publication ${fmtWhen(ev.t)}</span><span class="pill zero">—</span>`;
       else msg=`<span>Saisissez Actual et Forecast</span><span class="pill zero">—</span>`;
-      el.innerHTML=msg+(ev?`<div class="src" style="flex-basis:100%">Forecast et Previous remplis depuis le calendrier (${esc(ev.title)}, ${fmtWhen(ev.t)}). ${it.aSrc&&!(it.lock&&it.lock.a)?`<b>Actual automatique</b> (FRED, série ${esc(it.aSrc.series)}, période ${esc(it.aSrc.obs.slice(0,7))}) : vérifie-le sur la `:""}<a href="${officialUrl(c,i)}" target="_blank" rel="noopener">${it.aSrc&&!(it.lock&&it.lock.a)?"source officielle":"Source officielle de l'Actual"}</a>.</div>`:"");
+      el.innerHTML=msg+(ev?`<div class="src" style="flex-basis:100%">Forecast et Previous remplis depuis le calendrier (${esc(ev.title)}, ${fmtWhen(ev.t)}). ${it.aSrc&&!(it.lock&&it.lock.a)?`<b>Actual automatique</b> (${/^(Eurostat|BCE)/.test(it.aSrc.series)?esc(it.aSrc.series):"FRED, série "+esc(it.aSrc.series)}, période ${esc(it.aSrc.obs.slice(0,7))}) : vérifie-le sur la `:""}<a href="${officialUrl(c,i)}" target="_blank" rel="noopener">${it.aSrc&&!(it.lock&&it.lock.a)?"source officielle":"Source officielle de l'Actual"}</a>.</div>`:"");
       el.style.flexWrap="wrap";});
   }
   if(dataK==="cb"&&$("cbSum")){
@@ -801,7 +801,7 @@ let act=null;
 try{act=JSON.parse(localStorage.getItem(ACT_LS)||"null");}catch(e){}
 async function loadActuals(){
   try{const r=await fetch("actuals.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;
-    const d=await r.json();if(!d||!d.USD)return;act=d;
+    const d=await r.json();if(!d||(!d.USD&&!d.EUR))return;act=d;
     try{localStorage.setItem(ACT_LS,JSON.stringify(d));}catch(e){}
     applyCalendar();}catch(e){}
 }
@@ -813,8 +813,11 @@ function applyActuals(c,d){
     const key=ACT_KEYS[i];if(!key||!it.evt||it.evt.t>now||(it.lock&&it.lock.a))return;
     const kind=i===3?"chg":(i===4||i===6)?"level":(/y\/y/i.test(it.evt.title)?"yy":"mm");
     const rec=A[key]&&A[key][kind];if(!rec||rec.upd<it.evt.t-2*3600e3)return;
+    if(rec.maxLag!=null){ // la période du chiffre doit correspondre à cette annonce
+      const ev=new Date(it.evt.t),[y,m]=rec.obs.split("-").map(Number);
+      const lag=(ev.getUTCFullYear()-y)*12+(ev.getUTCMonth()+1-m);if(lag<0||lag>rec.maxLag)return;}
     const v=fmtV(rec.v);if(it.a!==v){it.a=v;ch=true;}
-    it.aSrc={series:rec.series,obs:rec.obs};
+    it.aSrc={series:rec.series,obs:rec.period||rec.obs};
   });
   const b=d.cb;b.lock=b.lock||{};
   if(b.evt&&b.evt.t<=now&&!b.lock.dec&&A.rate&&A.rate.level){const r=A.rate.level,day=new Date(b.evt.t).toISOString().slice(0,10);
