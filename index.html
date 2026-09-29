@@ -542,6 +542,8 @@ function renderData(){
         <div class="formrow"><div class="field"><label for="cbinfl">Inflation actuelle (%)</label>${numInput("cbinfl",b.infl,"Inflation actuelle")}</div>
         <div class="field"><label for="cbobj">Objectif (%)</label>${numInput("cbobj",b.obj,"Objectif",false)}</div></div></div>
       ${b.evt?`<p class="src">Taux attendu rempli depuis le calendrier (${esc(b.evt.title)}, ${fmtWhen(b.evt.t)}). ${b.evt.t<Date.now()&&num(b.dec)===null?`<span class="pend">Décision publiée : saisis le taux décidé.</span> `:""}<a href="${OFFICIAL[c].cb}" target="_blank" rel="noopener">Site de la banque centrale</a></p>`:""}
+      ${b.inflSrc&&!(b.lock&&b.lock.infl)?`<p class="src">Inflation actuelle remplie automatiquement : CPI sur un an (FRED), période ${esc(b.inflSrc.slice(0,7))}.</p>`:""}
+      ${b.decSrc&&!(b.lock&&b.lock.dec)?`<p class="src">Taux décidé rempli automatiquement (FRED, borne haute de la fourchette de la Fed).</p>`:""}
       <div class="panel" id="cbSum"></div>`;
   }else{
     body.innerHTML=`<div class="panel">
@@ -566,7 +568,7 @@ function updateComputed(){
       else if(st==="due")msg=`<span class="pend">Publié : saisis l'Actual</span><span class="pill zero">—</span>`;
       else if(st==="soon")msg=`<span>Publication ${fmtWhen(ev.t)}</span><span class="pill zero">—</span>`;
       else msg=`<span>Saisissez Actual et Forecast</span><span class="pill zero">—</span>`;
-      el.innerHTML=msg+(ev?`<div class="src" style="flex-basis:100%">Forecast et Previous remplis depuis le calendrier (${esc(ev.title)}, ${fmtWhen(ev.t)}). <a href="${officialUrl(c,i)}" target="_blank" rel="noopener">Source officielle de l'Actual</a></div>`:"");
+      el.innerHTML=msg+(ev?`<div class="src" style="flex-basis:100%">Forecast et Previous remplis depuis le calendrier (${esc(ev.title)}, ${fmtWhen(ev.t)}). ${it.aSrc&&!(it.lock&&it.lock.a)?`<b>Actual automatique</b> (FRED, série ${esc(it.aSrc.series)}, période ${esc(it.aSrc.obs.slice(0,7))}) : vérifie-le sur la `:""}<a href="${officialUrl(c,i)}" target="_blank" rel="noopener">${it.aSrc&&!(it.lock&&it.lock.a)?"source officielle":"Source officielle de l'Actual"}</a>.</div>`:"");
       el.style.flexWrap="wrap";});
   }
   if(dataK==="cb"&&$("cbSum")){
@@ -751,6 +753,7 @@ async function loadCalendar(force){
     applyCalendar();
   }catch(e){cal.error=navigator.onLine===false?"Hors ligne":"Flux indisponible";}
   if(view==="cal")renderCal(); if(view==="setup")updateSetup();
+  loadActuals();
 }
 function fmtWhen(t){const d=new Date(t);return d.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}
 function cleanNum(v){if(v===undefined||v===null)return "";const m=String(v).replace(",",".").match(/-?\d+(\.\d+)?/);return m?m[0].replace(".",","):"";}
@@ -771,7 +774,7 @@ function applyCalendar(){
       it.lock=it.lock||{};const e=findEvent(c,i);if(!e)return;
       const isNew=!it.evt||it.evt.id!==e.id;
       if(isNew){ // nouvelle publication : l'ancien Actual ne correspond plus
-        if(it.evt&&!it.lock.a)it.a="";
+        if(it.evt&&!it.lock.a){it.a="";it.aSrc=null;}
         if(it.evt){it.lock.a=false;it.lock.f=false;it.lock.p=false;}
       }
       const f=cleanNum(e.forecast),p=cleanNum(e.previous),a=cleanNum(e.actual);
@@ -788,8 +791,36 @@ function applyCalendar(){
       if(a&&!b.lock.dec&&String(b.dec)!==a){b.dec=a;changed=true;}
     }
   });
+  CURR.forEach(c=>{if(applyActuals(c,S.cur[c]))changed=true;});
   if(changed){save();renderAll();}
   return changed;
+}
+/* ===== Actual automatiques (fichier actuals.json produit par GitHub Actions depuis FRED) ===== */
+const ACT_LS="macro-score-actuals-v1";
+let act=null;
+try{act=JSON.parse(localStorage.getItem(ACT_LS)||"null");}catch(e){}
+async function loadActuals(){
+  try{const r=await fetch("actuals.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;
+    const d=await r.json();if(!d||!d.USD)return;act=d;
+    try{localStorage.setItem(ACT_LS,JSON.stringify(d));}catch(e){}
+    applyCalendar();}catch(e){}
+}
+const ACT_KEYS=["cpi","core","ppi","nfp","unrate","ahe","gdp",null,null,"retail"];
+function fmtV(v){return String(v).replace(".",",");}
+function applyActuals(c,d){
+  const A=act&&act[c];if(!A)return false;let ch=false;const now=Date.now();
+  d.ind.forEach((it,i)=>{
+    const key=ACT_KEYS[i];if(!key||!it.evt||it.evt.t>now||(it.lock&&it.lock.a))return;
+    const kind=i===3?"chg":(i===4||i===6)?"level":(/y\/y/i.test(it.evt.title)?"yy":"mm");
+    const rec=A[key]&&A[key][kind];if(!rec||rec.upd<it.evt.t-2*3600e3)return;
+    const v=fmtV(rec.v);if(it.a!==v){it.a=v;ch=true;}
+    it.aSrc={series:rec.series,obs:rec.obs};
+  });
+  const b=d.cb;b.lock=b.lock||{};
+  if(b.evt&&b.evt.t<=now&&!b.lock.dec&&A.rate&&A.rate.level){const r=A.rate.level,day=new Date(b.evt.t).toISOString().slice(0,10);
+    if(r.obs>day&&r.upd>=b.evt.t){const v=fmtV(r.v);if(String(b.dec)!==v){b.dec=v;b.decSrc=r.series;ch=true;}}}
+  if(!b.lock.infl&&A.cpi&&A.cpi.yy){const v=fmtV(A.cpi.yy.v);if(String(b.infl)!==v){b.infl=v;b.inflSrc=A.cpi.yy.obs;ch=true;}}
+  return ch;
 }
 function nextHigh(ccys){const now=Date.now()-5*60000;return cal.events.find(e=>e.impact==="High"&&!e.allDay&&e.t>=now&&ccys.includes(e.country))||null;}
 function inTxt(m){if(m<=0)return "maintenant";if(m<60)return "dans "+m+" min";const h=Math.floor(m/60),r=m%60;if(h<24)return "dans "+h+" h"+(r?" "+String(r).padStart(2,"0"):"");return "dans "+Math.round(h/24)+" j";}
