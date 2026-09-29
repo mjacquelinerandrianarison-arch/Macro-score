@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Macro Score</title>
+<meta name="description" content="Biais macro hebdomadaire, calendrier économique et grille d'entrée Breakout + Retest.">
+<meta name="theme-color" content="#17243A">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Macro Score">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF1F4; --card:#FFFFFF; --ink:#17243A; --slate:#5B6B80; --line:#D5DCE5;
+  --bull:#1F7A5C; --bull-soft:#DCEFE7; --bear:#B23A2E; --bear-soft:#F6DEDA;
+  --brass:#B8862B; --brass-soft:#F5EBD6; --field:#F6F8FA; --focus:#2C5E9E;
+  --tab-h:64px;
+  --sans:"Barlow",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --num:"Barlow Semi Condensed","Arial Narrow",-apple-system,"Segoe UI",Roboto,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#121A26; --card:#1A2433; --ink:#E6ECF3; --slate:#98A6B8; --line:#2C394B;
+    --bull:#4FBF97; --bull-soft:#173A31; --bear:#E07A6E; --bear-soft:#3D2226;
+    --brass:#D9AA52; --brass-soft:#3A3120; --field:#141D2A; --focus:#7FA8DE;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121A26; --card:#1A2433; --ink:#E6ECF3; --slate:#98A6B8; --line:#2C394B;
+  --bull:#4FBF97; --bull-soft:#173A31; --bear:#E07A6E; --bear-soft:#3D2226;
+  --brass:#D9AA52; --brass-soft:#3A3120; --field:#141D2A; --focus:#7FA8DE;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num-font{font-family:var(--num);font-variant-numeric:tabular-nums}
+
+main{max-width:640px;margin:0 auto;padding:18px 16px calc(var(--tab-h) + 28px + env(safe-area-inset-bottom,0px))}
+header.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+header.top h1{font-family:var(--num);font-weight:700;font-size:28px;line-height:1.05;margin:0;letter-spacing:-.01em}
+header.top p{margin:4px 0 0;color:var(--slate);font-size:14px}
+.iconbtn{border:1px solid var(--line);background:var(--card);border-radius:10px;width:40px;height:40px;display:grid;place-items:center;flex:none}
+.iconbtn svg{width:20px;height:20px}
+.status{font-size:12px;color:var(--slate);margin-top:2px;min-height:16px}
+
+.banner{background:var(--brass-soft);border-left:3px solid var(--brass);padding:10px 12px;border-radius:0 8px 8px 0;font-size:14px;margin-bottom:16px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.banner button{border:none;background:none;color:var(--brass);font-weight:600;padding:4px 0;white-space:nowrap}
+
+section.view{display:none}
+section.view.on{display:block}
+
+/* ---- Ladder (écran principal) ---- */
+.verdict{margin:6px 0 18px}
+.verdict .pair{font-family:var(--num);font-weight:700;font-size:44px;line-height:1;letter-spacing:-.01em}
+.verdict .dir{font-weight:600;font-size:17px;margin-top:6px}
+.verdict .why{color:var(--slate);font-size:14px;margin-top:4px}
+.dir.buy{color:var(--bull)} .dir.sell{color:var(--bear)} .dir.none{color:var(--slate)}
+
+.ladder{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 12px 8px}
+.scale{display:grid;grid-template-columns:44px 1fr 58px;font-size:11px;color:var(--slate);margin-bottom:4px}
+.scale .ticks{display:flex;justify-content:space-between;padding:0 1px}
+.rung{display:grid;grid-template-columns:44px 1fr 58px;align-items:center;min-height:46px;border-top:1px solid var(--line)}
+.rung:first-of-type{border-top:none}
+.rung .code{font-family:var(--num);font-weight:700;font-size:18px}
+.rung .track{position:relative;height:22px}
+.rung .track::before{content:"";position:absolute;left:50%;top:-6px;bottom:-6px;width:1px;background:var(--line)}
+.rung .bar{position:absolute;top:3px;height:16px;border-radius:3px}
+.rung .bar.pos{left:50%;background:var(--bull)}
+.rung .bar.neg{right:50%;background:var(--bear)}
+.rung .val{text-align:right;font-family:var(--num);font-weight:600;font-size:18px}
+.rung .sub{grid-column:2 / 4;font-size:12px;color:var(--slate);margin:-2px 0 6px}
+.rung.empty .code,.rung.empty .val{color:var(--slate)}
+
+h2{font-family:var(--num);font-weight:700;font-size:21px;margin:26px 0 10px}
+.muted{color:var(--slate);font-size:14px}
+
+/* ---- Segments et puces ---- */
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0 -16px 14px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 13px;font-family:var(--num);font-weight:600;font-size:15px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px}
+.seg button{border:none;background:none;border-radius:8px;padding:8px 6px;font-size:14px;font-weight:500;color:var(--slate)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 0 var(--line)}
+
+/* ---- Cartes indicateurs ---- */
+.factor{font-size:13px;color:var(--slate);margin:18px 0 6px;font-weight:600}
+.ind{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px 12px;margin-bottom:8px}
+.ind-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
+.ind-name{font-weight:600;font-size:15px}
+.ind-unit{font-size:12px;color:var(--slate);white-space:nowrap}
+.fields{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.field{min-width:0}
+.field label{display:block;font-size:11px;color:var(--slate);margin-bottom:2px}
+.numbox{display:flex;align-items:center;background:var(--field);border:1px solid var(--line);border-radius:8px;height:40px}
+.numbox:focus-within{border-color:var(--focus)}
+.numbox input{flex:1;min-width:0;border:none;background:none;padding:0 8px;height:100%;font-family:var(--num);font-size:17px;font-weight:500}
+.numbox input:focus{outline:none}
+.numbox .pm{border:none;background:none;width:28px;height:100%;color:var(--slate);font-size:15px;flex:none;border-left:1px solid var(--line)}
+.result{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:13px;color:var(--slate)}
+.pill{font-family:var(--num);font-weight:700;font-size:14px;border-radius:6px;padding:2px 8px;min-width:44px;text-align:center}
+.pill.pos{background:var(--bull-soft);color:var(--bull)}
+.pill.neg{background:var(--bear-soft);color:var(--bear)}
+.pill.zero{background:var(--field);color:var(--slate)}
+details.th{margin-top:8px;font-size:13px}
+details.th summary{color:var(--slate);cursor:pointer}
+details.th .fields{margin-top:6px}
+select.sel{width:100%;height:40px;border:1px solid var(--line);background:var(--field);border-radius:8px;padding:0 8px;font-size:15px}
+
+.formrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.formrow.one{grid-template-columns:1fr}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.panel h3{font-size:15px;margin:0 0 8px;font-weight:600}
+.subscore{display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:6px 0;border-top:1px solid var(--line)}
+.subscore:first-child{border-top:none}
+.total{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;padding-top:10px;border-top:2px solid var(--ink)}
+.total .big{font-family:var(--num);font-weight:700;font-size:30px}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{width:40px;height:40px;border-radius:8px;border:1px solid var(--line);background:var(--field);font-size:20px;line-height:1}
+.stepper output{min-width:44px;text-align:center;font-family:var(--num);font-weight:700;font-size:20px}
+.row-between{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0}
+.row-between + .row-between{border-top:1px solid var(--line)}
+
+/* ---- Paires ---- */
+.toggle{display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:10px}
+.toggle input{width:20px;height:20px;accent-color:var(--ink)}
+.pairs{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.pr{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:11px 12px;border-top:1px solid var(--line);align-items:center}
+.pr:first-child{border-top:none}
+.pr .nm{font-family:var(--num);font-weight:700;font-size:19px}
+.pr .sc{font-family:var(--num);font-weight:600;font-size:19px;text-align:right}
+.pr .meta{font-size:12.5px;color:var(--slate)}
+.badge{font-size:12px;font-weight:600;border-radius:6px;padding:2px 8px;justify-self:end}
+.badge.buy{background:var(--bull-soft);color:var(--bull)}
+.badge.sell{background:var(--bear-soft);color:var(--bear)}
+.badge.none{background:var(--field);color:var(--slate)}
+
+/* ---- Setup ---- */
+.check{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.check:first-of-type{border-top:none}
+.check input{width:22px;height:22px;accent-color:var(--ink);flex:none}
+.check span{flex:1;font-size:15px}
+.check b{font-family:var(--num);font-weight:700;color:var(--slate);min-width:26px;text-align:right}
+.decision{border-radius:14px;padding:16px;margin-top:14px;border:1px solid var(--line);background:var(--card)}
+.decision .score{font-family:var(--num);font-weight:700;font-size:52px;line-height:1}
+.decision .score small{font-size:22px;color:var(--slate);font-weight:600}
+.decision .label{font-weight:600;font-size:18px;margin-top:6px}
+.decision .note{font-size:14px;color:var(--slate);margin-top:6px}
+.decision.go{border-color:var(--bull);background:var(--bull-soft)}
+.decision.stop{border-color:var(--bear);background:var(--bear-soft)}
+.decision.wait{border-color:var(--brass);background:var(--brass-soft)}
+
+/* ---- Barre d'onglets ---- */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
+nav.tabs .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);height:var(--tab-h)}
+nav.tabs button{border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;color:var(--slate)}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-current="page"]{color:var(--ink);font-weight:600}
+
+/* ---- Réglages ---- */
+dialog{border:none;border-radius:16px;padding:0;max-width:520px;width:calc(100% - 24px);background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(10,16,26,.45)}
+dialog .dhead{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+dialog .dhead h2{margin:0}
+dialog .dbody{padding:12px 16px 16px;max-height:70vh;overflow:auto}
+.wrow{display:grid;grid-template-columns:1fr 90px;gap:10px;align-items:center;padding:6px 0}
+.danger{width:100%;height:44px;border-radius:10px;border:1px solid var(--bear);background:none;color:var(--bear);font-weight:600;margin-top:12px}
+.primary{width:100%;height:44px;border-radius:10px;border:none;background:var(--ink);color:var(--paper);font-weight:600;margin-top:8px}
+.warn{color:var(--bear);font-size:13px}
+.foot{font-size:12px;color:var(--slate);margin-top:24px}
+/* ---- Calendrier ---- */
+.calbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.calbar .muted{font-size:13px}
+.btn2{border:1px solid var(--line);background:var(--card);border-radius:10px;height:38px;padding:0 14px;font-weight:600;font-size:14px}
+.day{font-family:var(--num);font-weight:700;font-size:17px;margin:18px 0 6px}
+.day.today::after{content:" (aujourd'hui)";font-family:var(--sans);font-weight:500;font-size:13px;color:var(--brass)}
+.evs{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ev{display:grid;grid-template-columns:48px 5px 1fr auto;gap:0 10px;align-items:center;padding:10px 12px 10px 10px;border-top:1px solid var(--line);width:100%;text-align:left;background:none;border-left:none;border-right:none;border-bottom:none}
+.ev:first-child{border-top:none}
+.ev.past{opacity:.55}
+.ev.next{background:var(--brass-soft)}
+.ev .tm{font-family:var(--num);font-weight:600;font-size:15px}
+.ev .imp{width:5px;height:30px;border-radius:2px;background:var(--line)}
+.ev .imp.High{background:var(--bear)} .ev .imp.Medium{background:var(--brass)} .ev .imp.Low{background:var(--slate);opacity:.5}
+.ev .tt{font-size:14.5px;font-weight:600;line-height:1.25}
+.ev .fp{font-size:12.5px;color:var(--slate);margin-top:2px}
+.ev .cc{font-family:var(--num);font-weight:700;font-size:15px}
+.alert{border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px;background:var(--brass-soft);border-left:3px solid var(--brass)}
+.alert.hot{background:var(--bear-soft);border-left-color:var(--bear)}
+.empty{padding:16px;font-size:14px;color:var(--slate)}
+@media (prefers-reduced-motion:no-preference){
+  .rung .bar{transition:width .35s ease}
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div>
+      <h1 id="title">Biais de la semaine</h1>
+      <p id="subtitle">Macro Weekly + Breakout Retest</p>
+      <div class="status" id="status" aria-live="polite"></div>
+    </div>
+    <button class="iconbtn" id="openSettings" aria-label="Réglages">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+  </header>
+
+  <div class="banner" id="exampleBanner" hidden>
+    <span>USD et EUR contiennent des données d'exemple.</span>
+    <button id="clearExample">Commencer une semaine</button>
+  </div>
+
+  <!-- Classement -->
+  <section class="view on" id="v-rank" aria-labelledby="t-rank">
+    <div class="verdict" id="verdict"></div>
+    <div class="ladder" id="ladder"></div>
+    <p class="foot">Le biais indique seulement le sens autorisé. L'entrée dépend de la structure HTF, de la cassure et du retest (onglet Setup).</p>
+  </section>
+
+  <!-- Données -->
+  <section class="view" id="v-data">
+    <div class="chips" id="curChips" role="group" aria-label="Devise"></div>
+    <div class="seg" id="dataSeg" role="group" aria-label="Type de données">
+      <button data-k="ind" aria-pressed="true">Indicateurs</button>
+      <button data-k="cb" aria-pressed="false">Banque centrale</button>
+      <button data-k="oth" aria-pressed="false">Autres</button>
+    </div>
+    <div id="dataBody"></div>
+  </section>
+
+  <!-- Paires -->
+  <section class="view" id="v-pairs">
+    <label class="toggle"><input type="checkbox" id="onlyTradable" checked> Afficher seulement les paires tradables</label>
+    <div class="pairs" id="pairList"></div>
+    <p class="foot">Tradable : écart brut d'au moins 4, soit au moins +2 points macro sur 15. Classement par écart décroissant.</p>
+  </section>
+
+  <!-- Calendrier -->
+  <section class="view" id="v-cal">
+    <div class="calbar"><span class="muted" id="calInfo">Calendrier non chargé</span><button class="btn2" id="calRefresh">Actualiser</button></div>
+    <div class="chips" id="calChips" role="group" aria-label="Devises affichées"></div>
+    <div class="seg" id="impSeg" role="group" aria-label="Impact minimal">
+      <button data-imp="High" aria-pressed="true">Impact fort</button>
+      <button data-imp="Medium" aria-pressed="false">Moyen et fort</button>
+      <button data-imp="Low" aria-pressed="false">Tout</button>
+    </div>
+    <div id="calList"></div>
+    <p class="foot">Heures affichées dans le fuseau de ton téléphone. Forecast et Previous viennent du flux du calendrier (source de niveau 2) : l'Actual se vérifie sur le site officiel. Touche une annonce pour saisir les chiffres de la devise.</p>
+  </section>
+
+  <!-- Setup -->
+  <section class="view" id="v-setup">
+    <div class="panel">
+      <label class="field" for="setupPair"><span class="muted">Paire</span></label>
+      <select class="sel" id="setupPair"></select>
+      <div class="muted" id="setupMacro" style="margin-top:8px"></div>
+    </div>
+    <div class="panel" id="checks"></div>
+    <div class="panel">
+      <label class="check" style="border:none"><input type="checkbox" id="newsFlag"><span>Annonce majeure dans les prochaines heures (CPI, NFP, banque centrale…)</span></label>
+    </div>
+    <div id="newsAlert"></div>
+    <div class="decision" id="decision" aria-live="polite"></div>
+    <button class="primary" id="resetSetup" style="background:none;color:var(--ink);border:1px solid var(--line)">Décocher tout</button>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Navigation">
+  <div class="in">
+    <button data-v="rank" aria-current="page" id="t-rank">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M6 7h6M12 11h7M8 15h4M12 19h5"/></svg>Classement</button>
+    <button data-v="data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 10v10"/></svg>Données</button>
+    <button data-v="pairs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg>Paires</button>
+    <button data-v="cal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Calendrier</button>
+    <button data-v="setup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>Setup</button>
+  </div>
+</nav>
+
+<dialog id="settings" aria-labelledby="setTitle">
+  <div class="dhead"><h2 id="setTitle">Réglages</h2><button class="iconbtn" id="closeSettings" aria-label="Fermer">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dbody">
+    <p class="muted" style="margin-top:0">Fixez ces valeurs une fois, avant l'analyse. Ne les changez pas en cours de semaine.</p>
+    <div id="weights"></div>
+    <div class="warn" id="wWarn"></div>
+    <div class="wrow"><span>Multiplicateur note grille → /10</span><div class="numbox"><input id="mult" inputmode="decimal" aria-label="Multiplicateur"></div></div>
+    <div class="wrow"><span>Fenêtre « annonce imminente » (heures)</span><div class="numbox"><input id="newsWin" inputmode="decimal" aria-label="Fenêtre en heures"></div></div>
+    <div class="field" style="margin:6px 0 4px"><label for="feedUrl">Adresse du flux du calendrier</label><div class="numbox"><input id="feedUrl" inputmode="url" autocomplete="off" style="font-family:var(--sans);font-size:13px"></div></div>
+    <div class="wrow"><span>Thème</span><select class="sel" id="theme"><option value="">Automatique</option><option value="light">Clair</option><option value="dark">Sombre</option></select></div>
+    <button class="primary" id="installBtn" hidden>Installer l'application</button>
+    <p class="muted" id="iosHint" hidden>Sur iPhone : bouton Partager de Safari, puis « Sur l'écran d'accueil ».</p>
+    <h3 style="font-size:15px;margin:16px 0 4px">Sauvegarde</h3>
+    <p class="muted" style="margin:0 0 6px">Les données restent sur ce téléphone. Exporte une copie de temps en temps, ou pour les transférer sur un autre appareil.</p>
+    <div class="formrow"><button class="btn2" id="exportBtn">Exporter</button><button class="btn2" id="importBtn">Importer</button></div>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <button class="danger" id="newWeek">Nouvelle semaine : effacer les données saisies</button>
+    <p class="foot">Les seuils de chaque indicateur se règlent dans Données, sous chaque carte. Outil pédagogique : ce n'est pas un conseil en investissement.</p>
+  </div>
+</dialog>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= Référentiel ================= */
+const CURR=["USD","EUR","GBP","JPY","CHF","CAD","AUD","NZD"];
+const EMP={USD:[50,100,"milliers"],GBP:[50,100,"milliers"],CAD:[10,25,"milliers"],AUD:[10,25,"milliers"],
+           EUR:[0.1,0.3,"% T/T"],NZD:[0.2,0.5,"% T/T"],JPY:[0.1,0.3,"%"],CHF:[0.1,0.3,"%"]};
+function tpl(c){return [
+  {fac:"Inflation",name:"IPC (CPI) sur un an",unit:"% a/a",s1:.1,s2:.3,sens:1},
+  {fac:"Inflation",name:"IPC sous-jacent (Core)",unit:"% a/a",s1:.1,s2:.3,sens:1},
+  {fac:"Inflation",name:"Prix à la production (PPI)",unit:"% a/a",s1:.1,s2:.3,sens:1},
+  {fac:"Emploi",name:c==="USD"?"Emplois non agricoles (NFP)":"Variation de l'emploi",unit:EMP[c][2],s1:EMP[c][0],s2:EMP[c][1],sens:1},
+  {fac:"Emploi",name:"Taux de chômage",unit:"%",s1:.1,s2:.2,sens:-1},
+  {fac:"Emploi",name:"Salaires",unit:"% a/a",s1:.1,s2:.3,sens:1},
+  {fac:"Croissance",name:"PIB",unit:"%",s1:.1,s2:.3,sens:1},
+  {fac:"Croissance",name:"PMI manufacturier",unit:"points",s1:.5,s2:1.5,sens:1},
+  {fac:"Croissance",name:"PMI services",unit:"points",s1:.5,s2:1.5,sens:1},
+  {fac:"Croissance",name:"Ventes au détail",unit:"% m/m",s1:.3,s2:.8,sens:1}
+];}
+const TARGET={USD:2,EUR:2,GBP:2,JPY:2,CHF:1,CAD:2,AUD:2.5,NZD:2};
+const RATE_GRID=[[-9999,-10],[-49,-7],[-24,-4],[-9,-1],[0,0],[1,1],[10,4],[25,7],[50,10]];
+const INFL_GRID=[[-99,-10],[-1.99,-6],[-0.99,-3],[-0.49,0],[0.5,3],[1,6],[2,10]];
+const GUID=[["Très hawkish",10],["Hawkish",6],["Légèrement hawkish",3],["Neutre",0],["Légèrement dovish",-3],["Dovish",-6],["Très dovish",-10]];
+const PROJ=[["Fortement relevées",10],["Relevées",6],["Légèrement relevées",3],["Inchangées",0],["Légèrement abaissées",-3],["Abaissées",-6],["Fortement abaissées",-10]];
+const ANTI=[["Fortes hausses anticipées",10],["Hausse anticipée",6],["Légère hausse anticipée",3],["Statu quo anticipé",0],["Légère baisse anticipée",-3],["Baisse anticipée",-6],["Fortes baisses anticipées",-10]];
+const INTEREST=[[0,"Pas intéressant"],[2,"Faible"],[4,"Intéressant"],[6,"Fort"],[8,"Très fort"],[10.0001,"Exceptionnel"]];
+const MPOINTS=[[0,0],[4,2],[8,3]];
+const BIAS=[[-100,"Très bearish"],[-69.99,"Bearish"],[-39.99,"Légèrement bearish"],[-19.99,"Neutre"],[20,"Légèrement bullish"],[40,"Bullish"],[70,"Très bullish"]];
+const PAIRS=["EURUSD","GBPUSD","USDJPY","USDCHF","USDCAD","AUDUSD","NZDUSD","EURGBP","EURJPY","EURCHF","EURCAD","EURAUD","EURNZD","GBPJPY","GBPCHF","GBPCAD","GBPAUD","GBPNZD","AUDJPY","AUDCHF","AUDCAD","AUDNZD","NZDJPY","NZDCHF","NZDCAD","CADJPY","CADCHF","CHFJPY"].map(p=>({base:p.slice(0,3),quote:p.slice(3),name:p.slice(0,3)+"/"+p.slice(3)}));
+const CHECKS=[
+  ["htf","Structure HTF dans le même sens",2],["ema","Prix favorable vs EMA200",1],["zone","Zone H4/D1 intéressante",1],
+  ["brk","Cassure nette",2],["close","Clôture confirmée",1],["bos","BOS / CHOCH",1],
+  ["rt","Retest propre",2],["rej","Rejet (pin bar, engulfing…)",1],["conf","Confirmation M5/M15",1]
+];
+const DEFAULT_FEED="https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+const WLABEL={cb:"Banque centrale",inf:"Inflation",emp:"Emploi",cro:"Croissance",risk:"Risque / matières premières",ant:"Anticipations / événements"};
+
+/* ================= État ================= */
+function blankCur(c){return {ind:tpl(c).map(t=>({a:"",f:"",p:"",s1:t.s1,s2:t.s2,sens:t.sens})),
+  cb:{att:"",dec:"",infl:"",obj:TARGET[c],guid:"",proj:"",anti:""},risk:0,ant:0,conf:"Moyenne"};}
+function defaultState(withExample){
+  const s={v:1,example:!!withExample,weights:{cb:.30,inf:.20,emp:.15,cro:.15,risk:.10,ant:.10},mult:5,theme:"",
+    cur:{},setup:{pair:"",checks:{},news:false,dismissed:""},
+    newsWin:3,feedUrl:DEFAULT_FEED,calCur:CURR.slice(),calImp:"High"};
+  CURR.forEach(c=>s.cur[c]=blankCur(c));
+  if(withExample){
+    const U=[[3.2,2.9,2.7],[3.1,3.0,3.0],[2.0,2.1,2.3],[120,50,80],[4.0,4.2,4.1],[4.0,3.5,3.6],[2.4,2.0,1.8],[49.5,50.0,49.8],[52.0,51.5,51.0],[0.4,0.3,0.2]];
+    U.forEach((v,i)=>Object.assign(s.cur.USD.ind[i],{a:v[0],f:v[1],p:v[2]}));
+    const E={0:[1.8,2.0,2.1],1:[2.3,2.4,2.4],2:[-0.5,-0.3,-0.2],4:[6.5,6.4,6.4],6:[0.1,0.2,0.3],7:[45.5,46.5,46.0],8:[50.2,50.5,50.8]};
+    Object.keys(E).forEach(i=>Object.assign(s.cur.EUR.ind[i],{a:E[i][0],f:E[i][1],p:E[i][2]}));
+    Object.assign(s.cur.USD.cb,{att:4.5,dec:4.5,infl:3.2,guid:"Légèrement hawkish",proj:"Relevées",anti:"Légère hausse anticipée"});
+    Object.assign(s.cur.EUR.cb,{att:2.25,dec:2.0,infl:1.8,guid:"Dovish",proj:"Abaissées",anti:"Baisse anticipée"});
+    s.cur.USD.ant=1;s.cur.USD.conf="Haute";s.cur.EUR.ant=-2;
+  }
+  return s;
+}
+let S=defaultState(true);
+
+/* ================= Calculs ================= */
+const num=v=>{if(v===""||v===null||v===undefined)return null;const n=typeof v==="number"?v:parseFloat(String(v).replace(",",".").replace(/\s/g,""));return isFinite(n)?n:null;};
+const r4=x=>Math.round(x*1e4)/1e4;
+function lookup(grid,x){let out=grid[0][1];for(const [min,v] of grid){if(x>=min)out=v;}return out;}
+function listVal(list,label){const f=list.find(x=>x[0]===label);return f?f[1]:0;}
+function indNote(it){
+  const a=num(it.a),f=num(it.f);if(a===null||f===null)return null;
+  const s1=num(it.s1)||0,s2=num(it.s2)||0,sens=num(it.sens)||0;
+  const sur=a-f,o=r4(sur*sens);
+  let g; if(o>=s2)g=2;else if(o>=s1)g=1;else if(o>-s1)g=0;else if(o>-s2)g=-1;else g=-2;
+  return {sur:r4(sur),o,g,n10:g*(num(S.mult)||0)};
+}
+function cbScore(c){
+  const b=S.cur[c].cb, W={A:.25,B:.25,C:.20,D:.15,E:.15};
+  const att=num(b.att),dec=num(b.dec); const bps=(att!==null&&dec!==null)?Math.round((dec-att)*100):null;
+  const A=bps===null?0:lookup(RATE_GRID,bps);
+  const B=listVal(GUID,b.guid),C=listVal(PROJ,b.proj),E=listVal(ANTI,b.anti);
+  const infl=num(b.infl),obj=num(b.obj); const gap=(infl!==null&&obj!==null)?Math.round((infl-obj)*100)/100:null;
+  const D=gap===null?0:lookup(INFL_GRID,gap);
+  return {bps,gap,A,B,C,D,E,score:A*W.A+B*W.B+C*W.C+D*W.D+E*W.E};
+}
+function curScore(c){
+  const T=tpl(c),d=S.cur[c],acc={Inflation:[],Emploi:[],Croissance:[]};
+  d.ind.forEach((it,i)=>{const n=indNote(it);if(n)acc[T[i].fac].push(n.n10);});
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+  const cb=cbScore(c).score, inf=avg(acc.Inflation), emp=avg(acc.Emploi), cro=avg(acc.Croissance);
+  const w=S.weights, risk=num(d.risk)||0, ant=num(d.ant)||0;
+  const score=cb*w.cb+inf*w.inf+emp*w.emp+cro*w.cro+risk*w.risk+ant*w.ant;
+  const count=acc.Inflation.length+acc.Emploi.length+acc.Croissance.length;
+  const hasCb=num(d.cb.att)!==null||!!d.cb.guid||!!d.cb.proj||!!d.cb.anti||num(d.cb.infl)!==null;
+  return {c,cb,inf,emp,cro,risk,ant,score,bias:lookup(BIAS,score*10),count,filled:count>0||hasCb,conf:d.conf};
+}
+function allScores(){const m={};CURR.forEach(c=>m[c]=curScore(c));return m;}
+function pairRows(sc){
+  return PAIRS.map(p=>{const b=sc[p.base],q=sc[p.quote],raw=b.score-q.score,abs=Math.abs(raw),pts=lookup(MPOINTS,abs);
+    const conf=(b.conf==="Basse"||q.conf==="Basse")?"Basse":(b.conf==="Haute"&&q.conf==="Haute")?"Haute":"Moyenne";
+    return {...p,raw,norm:raw/2,abs,interest:lookup(INTEREST,abs),pts,dir:pts<2?"none":raw>0?"buy":"sell",conf,filled:b.filled&&q.filled};
+  }).sort((x,y)=>y.abs-x.abs);
+}
+
+/* ================= Format ================= */
+const nf2=new Intl.NumberFormat("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const nf0=new Intl.NumberFormat("fr-FR",{maximumFractionDigits:2});
+function sgn(x,d=2){if(x===null||x===undefined)return "—";const r=d===2?nf2.format(Math.abs(x)):nf0.format(Math.abs(x));return (x>0.00001?"+":x<-0.00001?"−":"")+r;}
+const DIRTXT={buy:"Achat uniquement",sell:"Vente uniquement",none:"Pas de trade"};
+const esc=s=>String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+function cls(x){return x>0.00001?"pos":x<-0.00001?"neg":"zero";}
+
+/* ================= Navigation ================= */
+const $=id=>document.getElementById(id);
+let view="rank", curSel="USD", dataK="ind";
+document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
+  view=b.dataset.v;
+  document.querySelectorAll("nav.tabs button").forEach(x=>{if(x===b)x.setAttribute("aria-current","page");else x.removeAttribute("aria-current");});
+  document.querySelectorAll("section.view").forEach(s=>s.classList.toggle("on",s.id==="v-"+view));
+  const titles={rank:"Biais de la semaine",data:"Saisie des données",pairs:"Paires",cal:"Calendrier économique",setup:"Setup d'entrée"};
+  $("title").textContent=titles[view];
+  renderAll(); window.scrollTo(0,0);
+}));
+
+/* ================= Rendu : classement ================= */
+function renderRank(){
+  const sc=allScores(), list=CURR.map(c=>sc[c]).sort((a,b)=>b.score-a.score);
+  const ticks=`<div class="scale"><span></span><div class="ticks num-font"><span>−10</span><span>−5</span><span>0</span><span>+5</span><span>+10</span></div><span></span></div>`;
+  $("ladder").innerHTML=ticks+list.map(s=>{
+    const w=Math.min(Math.abs(s.score),10)*5;
+    return `<div class="rung${s.filled?"":" empty"}"><span class="code">${s.c}</span>
+      <div class="track" aria-hidden="true"><div class="bar ${s.score>=0?"pos":"neg"}" style="width:${w}%"></div></div>
+      <span class="val">${sgn(s.score)}</span>
+      <span class="sub">${s.filled?`${esc(s.bias)}, confiance ${s.conf.toLowerCase()}, ${s.count} indicateur${s.count>1?"s":""}`:"Aucune donnée saisie"}</span></div>`;
+  }).join("");
+  const best=pairRows(sc).find(p=>p.filled);
+  const v=$("verdict");
+  if(!best||best.pts<2){
+    v.innerHTML=`<div class="pair">${best?best.name:"—"}</div><div class="dir none">Aucun biais assez net pour trader</div>
+      <div class="why">${best?`Écart le plus grand : ${sgn(best.raw)}. Il faut au moins 4.`:"Saisissez les données d'au moins deux devises."}</div>`;
+  }else{
+    v.innerHTML=`<div class="pair">${best.name}</div><div class="dir ${best.dir}">${DIRTXT[best.dir]}</div>
+      <div class="why">Écart ${sgn(best.raw)} (${best.interest.toLowerCase()}), ${best.base} ${sgn(sc[best.base].score)} contre ${best.quote} ${sgn(sc[best.quote].score)}.</div>`;
+  }
+}
+
+/* ================= Rendu : données ================= */
+function numInput(id,val,label,pm=true){
+  return `<div class="numbox"><input id="${id}" value="${val===""||val===null||val===undefined?"":esc(String(val).replace(".",","))}" inputmode="decimal" autocomplete="off" aria-label="${esc(label)}">${pm?`<button type="button" class="pm" data-for="${id}" aria-label="Changer le signe">±</button>`:""}</div>`;
+}
+function renderChips(){
+  $("curChips").innerHTML=CURR.map(c=>`<button class="chip" data-c="${c}" aria-pressed="${c===curSel}">${c}</button>`).join("");
+}
+$("curChips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;curSel=b.dataset.c;renderChips();renderData();});
+$("dataSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;dataK=b.dataset.k;
+  $("dataSeg").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));renderData();});
+
+function renderData(){
+  const c=curSel,d=S.cur[c],T=tpl(c),body=$("dataBody");
+  if(dataK==="ind"){
+    let html="",last="";
+    T.forEach((t,i)=>{
+      if(t.fac!==last){html+=`<div class="factor">${t.fac}</div>`;last=t.fac;}
+      const it=d.ind[i];
+      html+=`<div class="ind"><div class="ind-head"><span class="ind-name">${esc(t.name)}</span><span class="ind-unit">${esc(t.unit)}</span></div>
+        <div class="fields">
+          <div class="field"><label for="i${i}a">Actual</label>${numInput(`i${i}a`,it.a,t.name+" Actual")}</div>
+          <div class="field"><label for="i${i}f">Forecast</label>${numInput(`i${i}f`,it.f,t.name+" Forecast")}</div>
+          <div class="field"><label for="i${i}p">Previous</label>${numInput(`i${i}p`,it.p,t.name+" Previous")}</div>
+        </div>
+        <div class="result" id="r${i}"></div>
+        <details class="th"><summary>Seuils et sens</summary><div class="fields">
+          <div class="field"><label for="i${i}s1">Seuil faible</label>${numInput(`i${i}s1`,it.s1,"Seuil faible",false)}</div>
+          <div class="field"><label for="i${i}s2">Seuil fort</label>${numInput(`i${i}s2`,it.s2,"Seuil fort",false)}</div>
+          <div class="field"><label for="i${i}sens">Sens</label><select class="sel" id="i${i}sens">
+            <option value="1"${it.sens==1?" selected":""}>+1</option><option value="-1"${it.sens==-1?" selected":""}>−1</option><option value="0"${it.sens==0?" selected":""}>0 (ignoré)</option></select></div>
+        </div></details></div>`;
+    });
+    html+=`<div class="panel" id="facSum" style="margin-top:14px"></div>`;
+    body.innerHTML=html;
+  }else if(dataK==="cb"){
+    const b=d.cb, opt=(list,v)=>`<option value="">Choisir…</option>`+list.map(x=>`<option${x[0]===v?" selected":""}>${esc(x[0])}</option>`).join("");
+    body.innerHTML=`<div class="panel"><h3>Décision de taux</h3>
+        <p class="muted" style="margin:0 0 8px">Pas de réunion cette semaine : laissez vide, la note vaut 0.</p>
+        <div class="formrow"><div class="field"><label for="cbatt">Taux attendu (%)</label>${numInput("cbatt",b.att,"Taux attendu")}</div>
+        <div class="field"><label for="cbdec">Taux décidé (%)</label>${numInput("cbdec",b.dec,"Taux décidé")}</div></div></div>
+      <div class="panel"><h3>Communication et marché</h3>
+        <div class="formrow one"><div class="field"><label for="cbguid">Forward guidance</label><select class="sel" id="cbguid">${opt(GUID,b.guid)}</select></div></div>
+        <div class="formrow one"><div class="field"><label for="cbproj">Projections</label><select class="sel" id="cbproj">${opt(PROJ,b.proj)}</select></div></div>
+        <div class="formrow one"><div class="field"><label for="cbanti">Anticipations de marché</label><select class="sel" id="cbanti">${opt(ANTI,b.anti)}</select></div></div></div>
+      <div class="panel"><h3>Inflation vs objectif</h3>
+        <div class="formrow"><div class="field"><label for="cbinfl">Inflation actuelle (%)</label>${numInput("cbinfl",b.infl,"Inflation actuelle")}</div>
+        <div class="field"><label for="cbobj">Objectif (%)</label>${numInput("cbobj",b.obj,"Objectif",false)}</div></div></div>
+      <div class="panel" id="cbSum"></div>`;
+  }else{
+    body.innerHTML=`<div class="panel">
+      <div class="row-between"><div><div style="font-weight:600">Risque / matières premières</div><div class="muted">Risk-on / risk-off, Chine, pétrole, flux refuge</div></div>
+        <div class="stepper"><button type="button" data-step="risk" data-d="-1" aria-label="Diminuer">−</button><output id="o-risk">${sgn(d.risk,0)}</output><button type="button" data-step="risk" data-d="1" aria-label="Augmenter">+</button></div></div>
+      <div class="row-between"><div><div style="font-weight:600">Anticipations / événements</div><div class="muted">Ce qui est attendu cette semaine</div></div>
+        <div class="stepper"><button type="button" data-step="ant" data-d="-1" aria-label="Diminuer">−</button><output id="o-ant">${sgn(d.ant,0)}</output><button type="button" data-step="ant" data-d="1" aria-label="Augmenter">+</button></div></div>
+      <div class="row-between"><div><div style="font-weight:600">Confiance</div><div class="muted">Plus basse si un événement majeur approche</div></div></div>
+      <div class="seg" id="confSeg" style="margin:0">${["Haute","Moyenne","Basse"].map(x=>`<button type="button" data-conf="${x}" aria-pressed="${d.conf===x}">${x}</button>`).join("")}</div>
+      </div><div class="panel" id="facSum"></div>`;
+  }
+  updateComputed();
+}
+
+function updateComputed(){
+  const c=curSel,d=S.cur[c];
+  if(dataK==="ind"){
+    d.ind.forEach((it,i)=>{const el=$("r"+i);if(!el)return;const n=indNote(it);
+      el.innerHTML=n?`<span>Surprise ${sgn(n.sur)}${n.o!==n.sur?` (orientée ${sgn(n.o)})`:""}</span><span class="pill ${cls(n.g)}">${sgn(n.g,0)} / ${sgn(n.n10,0)}</span>`
+        :`<span>Saisissez Actual et Forecast</span><span class="pill zero">—</span>`;});
+  }
+  if(dataK==="cb"&&$("cbSum")){
+    const r=cbScore(c);
+    $("cbSum").innerHTML=`<div class="subscore"><span>A. Décision ${r.bps===null?"(pas de réunion)":`(${sgn(r.bps,0)} bps)`}</span><span class="pill ${cls(r.A)}">${sgn(r.A,0)}</span></div>
+      <div class="subscore"><span>B. Guidance</span><span class="pill ${cls(r.B)}">${sgn(r.B,0)}</span></div>
+      <div class="subscore"><span>C. Projections</span><span class="pill ${cls(r.C)}">${sgn(r.C,0)}</span></div>
+      <div class="subscore"><span>D. Inflation vs objectif ${r.gap===null?"":`(écart ${sgn(r.gap)})`}</span><span class="pill ${cls(r.D)}">${sgn(r.D,0)}</span></div>
+      <div class="subscore"><span>E. Anticipations</span><span class="pill ${cls(r.E)}">${sgn(r.E,0)}</span></div>
+      <div class="total"><span>Score banque centrale ${c}</span><span class="big">${sgn(r.score)}</span></div>`;
+  }
+  if($("facSum")&&dataK!=="cb"){
+    const s=curScore(c);
+    $("facSum").innerHTML=`<div class="subscore"><span>Banque centrale</span><span class="num-font">${sgn(s.cb)}</span></div>
+      <div class="subscore"><span>Inflation</span><span class="num-font">${sgn(s.inf)}</span></div>
+      <div class="subscore"><span>Emploi</span><span class="num-font">${sgn(s.emp)}</span></div>
+      <div class="subscore"><span>Croissance</span><span class="num-font">${sgn(s.cro)}</span></div>
+      <div class="subscore"><span>Risque</span><span class="num-font">${sgn(s.risk,0)}</span></div>
+      <div class="subscore"><span>Anticipations</span><span class="num-font">${sgn(s.ant,0)}</span></div>
+      <div class="total"><span>Macro Score ${c}<br><span class="muted">${esc(s.bias)}</span></span><span class="big">${sgn(s.score)}</span></div>`;
+  }
+}
+
+/* Saisie : délégation d'événements */
+function setFromInput(id,raw){
+  const c=curSel,d=S.cur[c];let m;
+  if((m=id.match(/^i(\d+)(a|f|p|s1|s2)$/))){d.ind[+m[1]][m[2]]=raw;}
+  else if((m=id.match(/^i(\d+)sens$/))){d.ind[+m[1]].sens=+raw;}
+  else if((m=id.match(/^cb(att|dec|infl|obj)$/))){d.cb[m[1]]=raw;}
+  else if((m=id.match(/^cb(guid|proj|anti)$/))){d.cb[m[1]]=raw;}
+  else return;
+  if(S.example){S.example=false;$("exampleBanner").hidden=true;}
+  updateComputed();save();
+}
+$("dataBody").addEventListener("input",e=>{if(e.target.id)setFromInput(e.target.id,e.target.value.trim());});
+$("dataBody").addEventListener("change",e=>{if(e.target.tagName==="SELECT")setFromInput(e.target.id,e.target.value);});
+$("dataBody").addEventListener("click",e=>{
+  const pm=e.target.closest(".pm");
+  if(pm){const inp=$(pm.dataset.for);let v=inp.value.trim();v=v.startsWith("-")||v.startsWith("−")?v.slice(1):(v?"-"+v:"-");inp.value=v;setFromInput(inp.id,v);inp.focus();return;}
+  const st=e.target.closest("[data-step]");
+  if(st){const d=S.cur[curSel],k=st.dataset.step;d[k]=Math.max(-10,Math.min(10,(num(d[k])||0)+(+st.dataset.d)));$("o-"+k).textContent=sgn(d[k],0);updateComputed();save();return;}
+  const cf=e.target.closest("[data-conf]");
+  if(cf){S.cur[curSel].conf=cf.dataset.conf;$("confSeg").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===cf));save();}
+});
+
+/* ================= Rendu : paires ================= */
+function renderPairs(){
+  const only=$("onlyTradable").checked, rows=pairRows(allScores()).filter(p=>!only||(p.pts>=2&&p.filled));
+  $("pairList").innerHTML=rows.length?rows.map(p=>`<div class="pr">
+      <span class="nm">${p.name}</span><span class="sc">${sgn(p.raw)}</span>
+      <span class="meta">${esc(p.interest)}, normalisé ${sgn(p.norm)}, confiance ${p.conf.toLowerCase()}, ${p.pts} pt${p.pts>1?"s":""} macro</span>
+      <span class="badge ${p.dir}">${DIRTXT[p.dir]}</span></div>`).join("")
+    :`<div class="pr"><span class="meta" style="grid-column:1/3">Aucune paire n'a un écart d'au moins 4 cette semaine. Pas de trade macro : attendez les prochaines publications.</span></div>`;
+}
+$("onlyTradable").addEventListener("change",renderPairs);
+
+/* ================= Rendu : setup ================= */
+function renderSetup(){
+  const rows=pairRows(allScores()), sel=$("setupPair");
+  if(!S.setup.pair||!PAIRS.find(p=>p.name===S.setup.pair)){const b=rows.find(p=>p.filled);S.setup.pair=b?b.name:"EUR/USD";}
+  sel.innerHTML=rows.map(p=>`<option${p.name===S.setup.pair?" selected":""}>${p.name}</option>`).join("");
+  $("checks").innerHTML=CHECKS.map(([k,l,pts])=>`<label class="check"><input type="checkbox" data-ck="${k}"${S.setup.checks[k]?" checked":""}><span>${l}</span><b>+${pts}</b></label>`).join("");
+  $("newsFlag").checked=!!S.setup.news;
+  updateSetup();
+}
+function updateSetup(){
+  const p=pairRows(allScores()).find(x=>x.name===S.setup.pair);
+  const ev=p?nextHigh([p.base,p.quote]):null, al=$("newsAlert");
+  if(ev){
+    const mins=Math.round((ev.t-Date.now())/60000), soon=mins<=(num(S.newsWin)||0)*60;
+    if(soon&&S.setup.dismissed!==ev.id&&!S.setup.news){S.setup.news=true;$("newsFlag").checked=true;}
+    al.innerHTML=`<div class="alert${soon?" hot":""}">Prochaine annonce à fort impact : <b>${esc(ev.title)}</b> (${ev.country}) ${inTxt(mins)}.</div>`;
+  }else al.innerHTML=cal.events.length?"":`<div class="alert">Calendrier non chargé : vérifie les annonces avant d'entrer (onglet Calendrier).</div>`;
+  const macro=p?p.pts:0, dir=p?p.dir:"none";
+  $("setupMacro").innerHTML=p?`Biais : <b class="dir ${dir}">${DIRTXT[dir]}</b>, écart ${sgn(p.raw)}, ${macro} point${macro>1?"s":""} macro.`:"";
+  const tech=CHECKS.reduce((a,[k,,pts])=>a+(S.setup.checks[k]?pts:0),0), total=macro+tech;
+  const dec=$("decision");let label,cl,note;
+  if(macro<2){cl="stop";label="Pas de trade";note="La macro doit donner au moins +2 dans le sens du trade. La technique ne compense jamais un biais faible ou contraire.";}
+  else if(S.setup.news){cl="wait";label="Attendre";note="Annonce majeure imminente : n'ouvrez pas de position juste avant.";}
+  else if(total<=7){cl="stop";label="Pas de trade";note="Score insuffisant. Attendez une cassure puis un retest confirmés.";}
+  else if(total<=9){cl="wait";label="Setup faible, attendre";note="Il manque des confirmations. Minimum 10 sur 15 pour entrer.";}
+  else{
+    cl="go";label=(total<=11?"Trade acceptable":total<=13?"Très bon setup":"Setup exceptionnel")+" : "+(dir==="buy"?"achat":"vente");
+    note=`Risque : ${total>=14?"1 % maximum":"0,5 %"} du capital. Stop au-delà du swing du retest, objectif avec un ratio gain/risque d'au moins 1:2.`;
+  }
+  dec.className="decision "+cl;
+  dec.innerHTML=`<div class="score">${total}<small> / 15</small></div><div class="label">${label}</div><div class="note">${note}</div>
+    <div class="note">Macro ${macro} + technique ${tech}</div>`;
+}
+$("setupPair").addEventListener("change",e=>{S.setup.pair=e.target.value;updateSetup();save();});
+$("checks").addEventListener("change",e=>{const k=e.target.dataset.ck;if(!k)return;S.setup.checks[k]=e.target.checked;updateSetup();save();});
+$("newsFlag").addEventListener("change",e=>{S.setup.news=e.target.checked;
+  if(!e.target.checked){const p=PAIRS.find(x=>x.name===S.setup.pair);const ev=p?nextHigh([p.base,p.quote]):null;if(ev)S.setup.dismissed=ev.id;}
+  updateSetup();save();});
+$("resetSetup").addEventListener("click",()=>{S.setup.checks={};S.setup.news=false;renderSetup();save();});
+
+/* ================= Réglages ================= */
+function renderSettings(){
+  $("weights").innerHTML=`<h3 style="font-size:15px;margin:6px 0">Pondérations du Macro Score (%)</h3>`+
+    Object.keys(WLABEL).map(k=>`<div class="wrow"><span>${WLABEL[k]}</span><div class="numbox"><input data-w="${k}" value="${Math.round(S.weights[k]*100)}" inputmode="decimal" aria-label="Poids ${WLABEL[k]}"></div></div>`).join("");
+  $("mult").value=String(S.mult).replace(".",",");
+  $("theme").value=S.theme||"";
+  $("newsWin").value=String(S.newsWin).replace(".",",");
+  $("feedUrl").value=S.feedUrl||DEFAULT_FEED;
+  $("installBtn").hidden=!deferredPrompt;
+  $("iosHint").hidden=!(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!navigator.standalone);
+  checkWeights();
+}
+function checkWeights(){const t=Object.values(S.weights).reduce((a,b)=>a+b,0);$("wWarn").textContent=Math.abs(t-1)>0.001?`Total actuel : ${Math.round(t*100)} %. Il doit faire 100 %.`:"";}
+$("weights").addEventListener("input",e=>{const k=e.target.dataset.w;if(!k)return;const n=num(e.target.value);S.weights[k]=n===null?0:n/100;checkWeights();save();});
+$("mult").addEventListener("input",e=>{const n=num(e.target.value);S.mult=n===null?0:n;save();});
+$("newsWin").addEventListener("input",e=>{const n=num(e.target.value);S.newsWin=n===null?0:n;save();});
+$("feedUrl").addEventListener("change",e=>{S.feedUrl=e.target.value.trim()||DEFAULT_FEED;save();loadCalendar(true);});
+$("exportBtn").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify(S,null,1)],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="macro-score-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);});
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+$("importFile").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{const s=JSON.parse(await f.text());if(!s||s.v!==1)throw 0;
+    if(!confirm("Remplacer les données de ce téléphone par celles du fichier ?"))return;
+    adopt(s);save();$("settings").close();setStatus("Sauvegarde importée");}
+  catch(err){alert("Ce fichier n'est pas une sauvegarde Macro Score valide.");}
+  e.target.value="";});
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;});
+$("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installBtn").hidden=true;});
+$("theme").addEventListener("change",e=>{S.theme=e.target.value;applyTheme();save();});
+function applyTheme(){if(S.theme)document.documentElement.setAttribute("data-theme",S.theme);else document.documentElement.removeAttribute("data-theme");}
+$("openSettings").addEventListener("click",()=>{renderSettings();$("settings").showModal();});
+$("closeSettings").addEventListener("click",()=>{$("settings").close();renderAll();});
+$("settings").addEventListener("close",renderAll);
+function newWeek(){
+  const keep={weights:S.weights,mult:S.mult,theme:S.theme,newsWin:S.newsWin,feedUrl:S.feedUrl,calCur:S.calCur,calImp:S.calImp,seuils:{}};
+  CURR.forEach(c=>keep.seuils[c]=S.cur[c].ind.map(i=>({s1:i.s1,s2:i.s2,sens:i.sens})));
+  S=defaultState(false);["weights","mult","theme","newsWin","feedUrl","calCur","calImp"].forEach(k=>S[k]=keep[k]);
+  CURR.forEach(c=>S.cur[c].ind.forEach((it,i)=>Object.assign(it,keep.seuils[c][i])));
+}
+$("newWeek").addEventListener("click",()=>{if(!confirm("Effacer toutes les données saisies de la semaine ? Les réglages et les seuils sont conservés."))return;newWeek();save();$("settings").close();renderAll();});
+$("clearExample").addEventListener("click",()=>{newWeek();save();renderAll();});
+
+/* ================= Rendu global ================= */
+function renderAll(){
+  $("exampleBanner").hidden=!S.example;
+  const d=new Date();$("subtitle").textContent="Semaine du "+d.toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+  if(view==="rank")renderRank();
+  if(view==="data"){renderChips();renderData();}
+  if(view==="pairs")renderPairs();
+  if(view==="setup")renderSetup();
+  if(view==="cal")renderCal();
+}
+
+/* ================= Calendrier ================= */
+const CAL_LS="macro-score-calendar-v1";
+let cal={events:[],fetchedAt:null,error:""};
+function parseEvents(arr){
+  if(!Array.isArray(arr))throw new Error("format");
+  return arr.map(e=>{const t=Date.parse(e.date);return {title:String(e.title||""),country:String(e.country||"").toUpperCase(),
+    t:isFinite(t)?t:null,allDay:!/T\d\d:\d\d/.test(String(e.date||""))||/All Day|Tentative/i.test(String(e.time||"")),
+    impact:String(e.impact||"Low"),forecast:String(e.forecast??""),previous:String(e.previous??""),actual:String(e.actual??"")};})
+    .filter(e=>e.t!==null).map(e=>({...e,id:e.t+"|"+e.country+"|"+e.title})).sort((a,b)=>a.t-b.t);
+}
+try{const c=JSON.parse(localStorage.getItem(CAL_LS)||"null");if(c&&Array.isArray(c.events))cal={events:c.events,fetchedAt:c.fetchedAt,error:""};}catch(e){}
+async function loadCalendar(force){
+  const age=cal.fetchedAt?Date.now()-cal.fetchedAt:Infinity;
+  if(!force&&age<60*60*1000)return;
+  $("calInfo").textContent="Chargement…";
+  try{
+    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),12000);
+    const r=await fetch(S.feedUrl||DEFAULT_FEED,{cache:"no-store",signal:ctl.signal});clearTimeout(to);
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    cal={events:parseEvents(await r.json()),fetchedAt:Date.now(),error:""};
+    try{localStorage.setItem(CAL_LS,JSON.stringify({events:cal.events,fetchedAt:cal.fetchedAt}));}catch(e){}
+  }catch(e){cal.error=navigator.onLine===false?"Hors ligne":"Flux indisponible";}
+  if(view==="cal")renderCal(); if(view==="setup")updateSetup();
+}
+function nextHigh(ccys){const now=Date.now()-5*60000;return cal.events.find(e=>e.impact==="High"&&!e.allDay&&e.t>=now&&ccys.includes(e.country))||null;}
+function inTxt(m){if(m<=0)return "maintenant";if(m<60)return "dans "+m+" min";const h=Math.floor(m/60),r=m%60;if(h<24)return "dans "+h+" h"+(r?" "+String(r).padStart(2,"0"):"");return "dans "+Math.round(h/24)+" j";}
+function renderCal(){
+  $("calChips").innerHTML=CURR.map(c=>`<button class="chip" data-cc="${c}" aria-pressed="${S.calCur.includes(c)}">${c}</button>`).join("");
+  $("impSeg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.imp===S.calImp));
+  const rank={High:3,Medium:2,Low:1,Holiday:0}, min=rank[S.calImp]||3;
+  const when=cal.fetchedAt?new Date(cal.fetchedAt).toLocaleString("fr-FR",{weekday:"short",hour:"2-digit",minute:"2-digit"}):"";
+  $("calInfo").textContent=cal.error?(cal.events.length?`${cal.error}, données du ${when}`:`${cal.error}. Vérifie ta connexion puis Actualiser.`)
+    :(cal.fetchedAt?`Mis à jour ${when}`:"Calendrier non chargé");
+  const list=cal.events.filter(e=>S.calCur.includes(e.country)&&(rank[e.impact]||0)>=min);
+  if(!list.length){$("calList").innerHTML=`<div class="evs"><div class="empty">${cal.events.length?"Aucune annonce pour ces filtres cette semaine.":`Le calendrier n'a pas pu être chargé. Tu peux le consulter sur <a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener">forexfactory.com</a>.`}</div></div>`;return;}
+  const now=Date.now(), nxt=list.find(e=>e.t>=now-5*60000), todayKey=new Date().toDateString();
+  let html="",day="";
+  list.forEach(e=>{
+    const d=new Date(e.t),k=d.toDateString();
+    if(k!==day){if(day)html+="</div>";day=k;html+=`<div class="day${k===todayKey?" today":""}">${d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div><div class="evs">`;}
+    const fp=[e.actual&&`Actual ${esc(e.actual)}`,e.forecast&&`Forecast ${esc(e.forecast)}`,e.previous&&`Previous ${esc(e.previous)}`].filter(Boolean).join(", ");
+    html+=`<button type="button" class="ev${e.t<now-5*60000?" past":""}${nxt&&e.id===nxt.id?" next":""}" data-cc="${e.country}">
+      <span class="tm">${e.allDay?"Journée":d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</span>
+      <span class="imp ${esc(e.impact)}" aria-label="Impact ${e.impact==="High"?"fort":e.impact==="Medium"?"moyen":"faible"}"></span>
+      <span><span class="tt">${esc(e.title)}</span>${fp?`<span class="fp" style="display:block">${fp}</span>`:""}</span>
+      <span class="cc">${e.country}</span></button>`;
+  });
+  $("calList").innerHTML=html+"</div>";
+}
+$("calChips").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;const c=b.dataset.cc;
+  S.calCur=S.calCur.includes(c)?S.calCur.filter(x=>x!==c):S.calCur.concat(c);if(!S.calCur.length)S.calCur=CURR.slice();save();renderCal();});
+$("impSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.calImp=b.dataset.imp;save();renderCal();});
+$("calRefresh").addEventListener("click",()=>loadCalendar(true));
+$("calList").addEventListener("click",e=>{const b=e.target.closest(".ev");if(!b||!CURR.includes(b.dataset.cc))return;
+  curSel=b.dataset.cc;dataK="ind";$("dataSeg").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.k==="ind"));
+  document.querySelector('nav.tabs button[data-v="data"]').click();});
+
+/* ================= Sauvegarde (sur le téléphone) ================= */
+const LS="macro-score-state-v1";
+let saveTimer=null;
+function setStatus(t){$("status").textContent=t;}
+function persistLocal(){try{localStorage.setItem(LS,JSON.stringify(S));return true;}catch(e){return false;}}
+function save(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>setStatus(persistLocal()?"Enregistré sur ce téléphone":"Enregistrement impossible : stockage du navigateur désactivé"),400);}
+function loadLocal(){try{const raw=localStorage.getItem(LS);if(raw){const s=JSON.parse(raw);if(s&&s.v===1)return s;}}catch(e){}return null;}
+function adopt(s){if(!s||s.v!==1)return;const base=defaultState(false);S=Object.assign(base,s);
+  S.setup=Object.assign({pair:"",checks:{},news:false,dismissed:""},s.setup||{});
+  CURR.forEach(c=>{if(!S.cur[c])S.cur[c]=blankCur(c);});applyTheme();renderAll();}
+
+const local=loadLocal(); if(local)adopt(local); else renderAll();
+applyTheme();
+loadCalendar(false);
+setInterval(()=>{if(view==="setup")updateSetup();if(view==="cal")renderCal();},60000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadCalendar(false);});
+if("serviceWorker" in navigator&&location.protocol.startsWith("http")){navigator.serviceWorker.register("sw.js").catch(()=>{});}
+})();
+</script>
+</body>
+</html>
